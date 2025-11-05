@@ -49,6 +49,35 @@ EVENT_OBJECT_DESTROY = 0x8001
 SW_HIDE = 0
 SW_RESTORE = 9
 
+def get_icon_from_exe(exe_path):
+    try:
+        large, small = win32gui.ExtractIconEx(exe_path, 0)
+        hicon = large[0] if large else small[0] if small else None
+        if not hicon:
+            return None
+
+        hdc = win32ui.CreateDCFromHandle(win32gui.GetDC(0))
+        mem_dc = hdc.CreateCompatibleDC()
+        bmp = win32ui.CreateBitmap()
+        bmp.CreateCompatibleBitmap(hdc, 64, 64)
+        mem_dc.SelectObject(bmp)
+
+        win32gui.DrawIconEx(mem_dc.GetSafeHdc(), 0, 0, hicon, 64, 64, 0, None, win32con.DI_NORMAL)
+
+        bmpinfo = bmp.GetInfo()
+        bmpstr = bmp.GetBitmapBits(True)
+        img = Image.frombuffer('RGB', (bmpinfo['bmWidth'], bmpinfo['bmHeight']), bmpstr, 'raw', 'BGRX', 0, 1)
+
+        win32gui.DestroyIcon(hicon)
+        mem_dc.DeleteDC()
+        hdc.DeleteDC()
+
+        return img
+    except Exception:
+        traceback.print_exc()
+        return None
+
+
 def get_shell_icon(index=122):  # Index 167 is the blue arrow icon
     try:
         dll_path = os.path.join(os.environ['SystemRoot'], 'System32', 'shell32.dll')
@@ -156,10 +185,12 @@ def make_image(text="T"):
 
 
 class WindowMatch:
-    def __init__(self, title_contains=None, class_name=None, exe_name=None):
+    def __init__(self, title_contains=None, class_name=None, exe_name=None, icon_exe=None):
         self.title_contains = title_contains.lower() if title_contains else None
         self.class_name = class_name.lower() if class_name else None
         self.exe_name = exe_name.lower() if exe_name else None
+        self.icon_exe = icon_exe
+
 
     def matches(self, hwnd):
         try:
@@ -188,18 +219,26 @@ import pystray._win32 as win32_impl  # Only works on Windows
 
 
 class MonitoredWindow:
-    def __init__(self, hwnd):
+    def __init__(self, hwnd, match: WindowMatch):
         self.hwnd = hwnd
         self.title = win32gui.GetWindowText(hwnd)
         self.tray_icon = None
         self.hidden = False
+        self.match = match
+
 
  
     def create_tray_icon(self, on_restore):
         if self.tray_icon:
             return
-        
-        img = get_window_icon(self.hwnd) or make_image(self.title[:1] or "W")
+
+        # Use icon_exe if specified
+        if self.match.icon_exe:
+            img = get_icon_from_exe(self.match.icon_exe)
+        else:
+            img = get_window_icon(self.hwnd)
+
+        img = img or make_image(self.title[:1] or "W")
 
 
         icon = pystray.Icon(
@@ -278,7 +317,8 @@ class TrayMonitorApp:
                     with self.lock:
                         if hwnd not in self.monitored:
                             print(f"Adding monitor for {hex(hwnd)} - {win32gui.GetWindowText(hwnd)}")
-                            self.monitored[hwnd] = MonitoredWindow(hwnd)
+                            self.monitored[hwnd] = MonitoredWindow(hwnd, m)
+
             return True
         win32gui.EnumWindows(enum_proc, None)
 
