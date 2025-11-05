@@ -1,4 +1,7 @@
 {
+  "settings": {
+    "show_main_icon": false
+  },
   "windows": [
     {
       "title_contains": "Notepad++",

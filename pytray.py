@@ -280,16 +280,42 @@ class TrayMonitorApp:
         self._we_proc = None
         self._load_config()
         self.main_icon = self._create_main_tray_icon()
+        self.show_main_icon = True
+
+
+    def _toggle_main_icon(self):
+        self.show_main_icon = not self.show_main_icon
+        self._save_config()
+
+        if not self.show_main_icon and self.main_icon:
+            try:
+                self.main_icon.stop()
+            except Exception:
+                pass
+        elif self.show_main_icon and not self.main_icon.visible:
+            threading.Thread(target=self.main_icon.run, daemon=True).start()
 
     def _create_main_tray_icon(self):
-        img = get_shell_icon() or make_image('M')
-        icon = pystray.Icon('tray-monitor', img, 'Window Tray Monitor',
-                             menu=pystray.Menu(
-                                 pystray.MenuItem('Status', lambda: self._print_status()),
-                                 pystray.MenuItem('Exit', lambda: self.stop())
-                             ))
-        t = threading.Thread(target=icon.run, daemon=True)
-        t.start()
+
+        menu = pystray.Menu(
+            pystray.MenuItem('Status', lambda: self._print_status()),
+            pystray.MenuItem(
+                'Hide Main Icon',
+                lambda: self._toggle_main_icon(),
+                checked=lambda item: not self.show_main_icon
+            ),
+            pystray.MenuItem('Exit', lambda: self.stop())
+        )
+        
+        img = get_shell_icon(122) or make_image('M')
+        icon = pystray.Icon('tray-monitor', img, 'Window Tray Monitor', menu=menu)
+
+        def run_icon():
+            icon.run()
+
+        self.main_icon = icon
+        if self.show_main_icon:
+            threading.Thread(target=run_icon, daemon=True).start()
         return icon
 
     def _print_status(self):
@@ -301,12 +327,31 @@ class TrayMonitorApp:
     def _load_config(self):
         if not os.path.exists(self.config_path):
             print(f"Config {self.config_path} not found. Creating example config.")
-            example = {"windows": [{"title_contains": "notepad", "exe_name": "notepad.exe"}]}
+            example = {
+                "settings": {"show_main_icon": True},
+                "windows": [{"title_contains": "notepad", "exe_name": "notepad.exe"}]
+            }
             with open(self.config_path, 'w') as f:
                 json.dump(example, f, indent=2)
+
         with open(self.config_path, 'r') as f:
             cfg = json.load(f)
+
+        self.show_main_icon = cfg.get("settings", {}).get("show_main_icon", True)
         self.matches = [WindowMatch(**w) for w in cfg.get('windows', [])]
+
+    def _save_config(self):
+        try:
+            with open(self.config_path, 'r') as f:
+                cfg = json.load(f)
+        except Exception:
+            cfg = {}
+
+        cfg.setdefault("settings", {})["show_main_icon"] = self.show_main_icon
+
+        with open(self.config_path, 'w') as f:
+            json.dump(cfg, f, indent=2)
+
 
     def _enumerate_and_update(self):
         found = set()
