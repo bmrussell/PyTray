@@ -80,6 +80,23 @@ class WindowMatch:
         except Exception:
             return False
 
+import pystray._win32 as win32_impl  # Only works on Windows
+
+
+class ClickableIcon(pystray.Icon):
+    def _run_detached(self):
+        super()._run_detached()
+        # Override the click handler
+        def on_click(icon, button, pressed):
+            if button == 1 and pressed:  # Left click down
+                self._on_left_click()
+
+        if hasattr(self._listener, '_on_click'):
+            self._listener._on_click = on_click
+
+    def _on_left_click(self):
+        # This will be set externally
+        pass
 
 class MonitoredWindow:
     def __init__(self, hwnd):
@@ -88,19 +105,41 @@ class MonitoredWindow:
         self.tray_icon = None
         self.hidden = False
 
+    # def create_tray_icon(self, on_restore):
+    #     if self.tray_icon:
+    #         return
+    #     img = make_image(self.title[:1] or "W")
+    #     icon = pystray.Icon(f"win-{self.hwnd}", img, self.title,
+    #                          menu=pystray.Menu(
+    #                              pystray.MenuItem('Restore', lambda: on_restore(self.hwnd)),
+    #                              pystray.MenuItem('Quit', lambda: icon.stop())
+    #                          ))
+    #     t = threading.Thread(target=icon.run, daemon=True)
+    #     t.start()
+    #     self.tray_icon = icon
+
     def create_tray_icon(self, on_restore):
         if self.tray_icon:
             return
         img = make_image(self.title[:1] or "W")
-        icon = pystray.Icon(f"win-{self.hwnd}", img, self.title,
-                             menu=pystray.Menu(
-                                 pystray.MenuItem('Restore', lambda: on_restore(self.hwnd)),
-                                 pystray.MenuItem('Quit', lambda: icon.stop())
-                             ))
+
+        icon = pystray.Icon(
+            name=f"win-{self.hwnd}",
+            icon=img,
+            title=self.title,
+            menu=pystray.Menu(
+                pystray.MenuItem('Restore', lambda: on_restore(self.hwnd), default=True),
+                pystray.MenuItem('Quit', lambda: icon.stop())
+            )
+        )
+
         t = threading.Thread(target=icon.run, daemon=True)
         t.start()
         self.tray_icon = icon
 
+
+
+ 
     def destroy_tray_icon(self):
         if self.tray_icon:
             try:
@@ -193,7 +232,10 @@ class TrayMonitorApp:
         except Exception:
             pass
         print("Stopped")
-        sys.exit(0)
+
+        # Exit in a separate thread to avoid crashing the message handler
+        threading.Thread(target=lambda: os._exit(0), daemon=True).start()
+
 
     def _poll_loop(self):
         while self.running:
