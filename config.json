@@ -1,0 +1,8 @@
+{
+  "windows": [
+    {
+      "title_contains": "Notepad++",
+      "exe_name": "notepad++.exe"
+    }
+  ]
+}
