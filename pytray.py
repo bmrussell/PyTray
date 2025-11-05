@@ -14,6 +14,13 @@ import time
 import traceback
 from ctypes import wintypes
 
+import psutil
+import win32api
+import win32con
+import win32gui
+import win32ui
+from PIL import Image
+
 try:
     import win32con
     import win32gui
@@ -41,6 +48,103 @@ EVENT_OBJECT_DESTROY = 0x8001
 
 SW_HIDE = 0
 SW_RESTORE = 9
+
+def get_shell_icon(index=122):  # Index 167 is the blue arrow icon
+    try:
+        dll_path = os.path.join(os.environ['SystemRoot'], 'System32', 'shell32.dll')
+        large, small = win32gui.ExtractIconEx(dll_path, index)
+        hicon = large[0] if large else small[0] if small else None
+        if not hicon:
+            return None
+
+        hdc = win32ui.CreateDCFromHandle(win32gui.GetDC(0))
+        mem_dc = hdc.CreateCompatibleDC()
+        bmp = win32ui.CreateBitmap()
+        bmp.CreateCompatibleBitmap(hdc, 64, 64)
+        mem_dc.SelectObject(bmp)
+
+        win32gui.DrawIconEx(mem_dc.GetSafeHdc(), 0, 0, hicon, 64, 64, 0, None, win32con.DI_NORMAL)
+
+        bmpinfo = bmp.GetInfo()
+        bmpstr = bmp.GetBitmapBits(True)
+        img = Image.frombuffer('RGB', (bmpinfo['bmWidth'], bmpinfo['bmHeight']), bmpstr, 'raw', 'BGRX', 0, 1)
+
+        win32gui.DestroyIcon(hicon)
+        mem_dc.DeleteDC()
+        hdc.DeleteDC()
+
+        return img
+    except Exception:
+        traceback.print_exc()
+        return None
+
+
+def get_app_icon():
+    try:
+        exe_path = sys.executable  # Path to your running .exe or python.exe
+        large, small = win32gui.ExtractIconEx(exe_path, 0)
+        hicon = large[0] if large else small[0] if small else None
+        if not hicon:
+            return None
+
+        hdc = win32ui.CreateDCFromHandle(win32gui.GetDC(0))
+        mem_dc = hdc.CreateCompatibleDC()
+        bmp = win32ui.CreateBitmap()
+        bmp.CreateCompatibleBitmap(hdc, 64, 64)
+        mem_dc.SelectObject(bmp)
+
+        win32gui.DrawIconEx(mem_dc.GetSafeHdc(), 0, 0, hicon, 64, 64, 0, None, win32con.DI_NORMAL)
+
+        bmpinfo = bmp.GetInfo()
+        bmpstr = bmp.GetBitmapBits(True)
+        img = Image.frombuffer('RGB', (bmpinfo['bmWidth'], bmpinfo['bmHeight']), bmpstr, 'raw', 'BGRX', 0, 1)
+
+        win32gui.DestroyIcon(hicon)
+        mem_dc.DeleteDC()
+        hdc.DeleteDC()
+
+        return img
+    except Exception:
+        traceback.print_exc()
+        return None
+
+
+def get_window_icon(hwnd):
+    try:
+        tid, pid = win32process.GetWindowThreadProcessId(hwnd)
+        exe_path = psutil.Process(pid).exe()
+
+        large, small = win32gui.ExtractIconEx(exe_path, 0)
+        hicon = large[0] if large else small[0] if small else None
+        if not hicon:
+            return None
+
+        # Create a memory DC and compatible bitmap
+        hdc = win32ui.CreateDCFromHandle(win32gui.GetDC(0))
+        mem_dc = hdc.CreateCompatibleDC()
+        bmp = win32ui.CreateBitmap()
+        bmp.CreateCompatibleBitmap(hdc, 64, 64)
+        mem_dc.SelectObject(bmp)
+
+        # Draw the icon into the memory DC
+        win32gui.DrawIconEx(mem_dc.GetSafeHdc(), 0, 0, hicon, 64, 64, 0, None, win32con.DI_NORMAL)
+
+        # Convert to PIL image
+        bmpinfo = bmp.GetInfo()
+        bmpstr = bmp.GetBitmapBits(True)
+        img = Image.frombuffer('RGB', (bmpinfo['bmWidth'], bmpinfo['bmHeight']), bmpstr, 'raw', 'BGRX', 0, 1)
+
+        # Cleanup
+        win32gui.DestroyIcon(hicon)
+        mem_dc.DeleteDC()
+        hdc.DeleteDC()
+
+        return img
+    except Exception:
+        traceback.print_exc()
+        return None
+
+
 
 
 def make_image(text="T"):
@@ -83,21 +187,6 @@ class WindowMatch:
 import pystray._win32 as win32_impl  # Only works on Windows
 
 
-class ClickableIcon(pystray.Icon):
-    def _run_detached(self):
-        super()._run_detached()
-        # Override the click handler
-        def on_click(icon, button, pressed):
-            if button == 1 and pressed:  # Left click down
-                self._on_left_click()
-
-        if hasattr(self._listener, '_on_click'):
-            self._listener._on_click = on_click
-
-    def _on_left_click(self):
-        # This will be set externally
-        pass
-
 class MonitoredWindow:
     def __init__(self, hwnd):
         self.hwnd = hwnd
@@ -105,23 +194,13 @@ class MonitoredWindow:
         self.tray_icon = None
         self.hidden = False
 
-    # def create_tray_icon(self, on_restore):
-    #     if self.tray_icon:
-    #         return
-    #     img = make_image(self.title[:1] or "W")
-    #     icon = pystray.Icon(f"win-{self.hwnd}", img, self.title,
-    #                          menu=pystray.Menu(
-    #                              pystray.MenuItem('Restore', lambda: on_restore(self.hwnd)),
-    #                              pystray.MenuItem('Quit', lambda: icon.stop())
-    #                          ))
-    #     t = threading.Thread(target=icon.run, daemon=True)
-    #     t.start()
-    #     self.tray_icon = icon
-
+ 
     def create_tray_icon(self, on_restore):
         if self.tray_icon:
             return
-        img = make_image(self.title[:1] or "W")
+        
+        img = get_window_icon(self.hwnd) or make_image(self.title[:1] or "W")
+
 
         icon = pystray.Icon(
             name=f"win-{self.hwnd}",
@@ -164,7 +243,7 @@ class TrayMonitorApp:
         self.main_icon = self._create_main_tray_icon()
 
     def _create_main_tray_icon(self):
-        img = make_image('M')
+        img = get_shell_icon() or make_image('M')
         icon = pystray.Icon('tray-monitor', img, 'Window Tray Monitor',
                              menu=pystray.Menu(
                                  pystray.MenuItem('Status', lambda: self._print_status()),
