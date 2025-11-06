@@ -1,16 +1,17 @@
 {
   "settings": {
-    "show_main_icon": false
+    "show_main_icon": true
   },
   "windows": [
-    {
-      "title_contains": "Notepad++",
-      "exe_name": "notepad++.exe"
-    },
     {
       "title_contains": "Slack PWA",
       "exe_name": "chrome.exe",
       "icon_exe": "C:\\Users\\brian\\AppData\\Local\\slack\\slack.exe"
+    },
+    {
+      "title_contains": "Visual Studio Code",
+      "exe_name": "Code.exe",
+      "icon_exe": "C:\\Users\\brian\\AppData\\Local\\Programs\\Microsoft VS Code\\Code.exe"
     }
   ]
 }

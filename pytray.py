@@ -49,6 +49,19 @@ EVENT_OBJECT_DESTROY = 0x8001
 SW_HIDE = 0
 SW_RESTORE = 9
 
+USER32 = ctypes.windll.user32
+OLE32 = ctypes.windll.ole32
+
+WinEventProcType = ctypes.WINFUNCTYPE(
+    None, wintypes.HANDLE, wintypes.DWORD, wintypes.HWND,
+    wintypes.LONG, wintypes.LONG, wintypes.DWORD, wintypes.DWORD
+)
+
+EVENT_OBJECT_SHOW = 0x8002
+EVENT_OBJECT_CREATE = 0x8000
+WINEVENT_OUTOFCONTEXT = 0x0000
+
+
 def get_icon_from_exe(exe_path):
     try:
         large, small = win32gui.ExtractIconEx(exe_path, 0)
@@ -282,6 +295,21 @@ class TrayMonitorApp:
         self.main_icon = self._create_main_tray_icon()
         self.show_main_icon = True
 
+    def _setup_icon_refresh_hooks(self):
+        def callback(hWinEventHook, event, hwnd, idObject, idChild, dwEventThread, dwmsEventTime):
+            if hwnd in self.monitored:
+                mw = self.monitored[hwnd]
+                if mw.hidden:
+                    new_img = get_window_icon(hwnd)
+                    if new_img:
+                        mw.tray_icon.icon = new_img
+
+        self._icon_hook_proc = WinEventProcType(callback)
+        self._icon_hook = USER32.SetWinEventHook(
+            EVENT_OBJECT_SHOW, EVENT_OBJECT_SHOW,
+            0, self._icon_hook_proc,
+            0, 0, WINEVENT_OUTOFCONTEXT
+        )
 
     def _toggle_main_icon(self):
         self.show_main_icon = not self.show_main_icon
@@ -381,12 +409,18 @@ class TrayMonitorApp:
                 mw.destroy_tray_icon()
 
     def start(self):
-        self.running = True
+        self.running = True        
         threading.Thread(target=self._poll_loop, daemon=True).start()
         threading.Thread(target=self._setup_win_event_hooks, daemon=True).start()
+        self._setup_icon_refresh_hooks()
+
 
     def stop(self):
         self.running = False
+        
+        if hasattr(self, '_icon_hook'):
+            USER32.UnhookWinEvent(self._icon_hook)
+        
         with self.lock:
             for mw in list(self.monitored.values()):
                 mw.destroy_tray_icon()
@@ -399,6 +433,8 @@ class TrayMonitorApp:
 
         # Exit in a separate thread to avoid crashing the message handler
         threading.Thread(target=lambda: os._exit(0), daemon=True).start()
+        
+        
 
 
     def _poll_loop(self):
