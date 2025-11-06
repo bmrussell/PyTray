@@ -91,6 +91,29 @@ def get_icon_from_exe(exe_path):
         return None
 
 
+def get_icon_from_png(png_path):
+    """Load a PNG (or other image file) and convert it to a 64x64 RGBA PIL Image.
+
+    This mirrors get_icon_from_exe which returns a PIL Image suitable for pystray.
+    """
+    try:
+        if not os.path.exists(png_path):
+            return None
+        img = Image.open(png_path).convert('RGBA')
+        # Resize keeping aspect ratio, pad transparent background if needed
+        img = img.copy()
+        img.thumbnail((64, 64), Image.LANCZOS)
+        # Create a transparent background and paste centered
+        bg = Image.new('RGBA', (64, 64), (0, 0, 0, 0))
+        x = (64 - img.width) // 2
+        y = (64 - img.height) // 2
+        bg.paste(img, (x, y), img)
+        return bg
+    except Exception:
+        traceback.print_exc()
+        return None
+
+
 def get_shell_icon(index=122):  # Index 167 is the blue arrow icon
     try:
         dll_path = os.path.join(os.environ['SystemRoot'], 'System32', 'shell32.dll')
@@ -198,11 +221,11 @@ def make_image(text="T"):
 
 
 class WindowMatch:
-    def __init__(self, title_contains=None, class_name=None, exe_name=None, icon_exe=None):
+    def __init__(self, title_contains=None, class_name=None, exe_name=None, icon_path=None):
         self.title_contains = title_contains.lower() if title_contains else None
         self.class_name = class_name.lower() if class_name else None
         self.exe_name = exe_name.lower() if exe_name else None
-        self.icon_exe = icon_exe
+        self.icon_path = icon_path
 
 
     def matches(self, hwnd):
@@ -245,10 +268,17 @@ class MonitoredWindow:
         if self.tray_icon:
             return
 
-        # Use icon_exe if specified
-        if self.match.icon_exe:
-            img = get_icon_from_exe(self.match.icon_exe)
-        else:
+    # Use icon_path if specified. Support either an executable path (extract icon)
+        # or an image file (png/jpg) — image files will be loaded and resized.
+        img = None
+        if self.match.icon_path:
+            lower = self.match.icon_path.lower()
+            if lower.endswith('.png') or lower.endswith('.jpg') or lower.endswith('.jpeg') or lower.endswith('.bmp'):
+                img = get_icon_from_png(self.match.icon_path)
+            else:
+                img = get_icon_from_exe(self.match.icon_path)
+
+        if img is None:
             img = get_window_icon(self.hwnd)
 
         img = img or make_image(self.title[:1] or "W")

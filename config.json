@@ -6,12 +6,17 @@
     {
       "title_contains": "Slack PWA",
       "exe_name": "chrome.exe",
-      "icon_exe": "C:\\Users\\brian\\AppData\\Local\\slack\\slack.exe"
+      "icon_path": "C:\\Users\\brian\\AppData\\Local\\slack\\slack.exe"
     },
     {
       "title_contains": "Visual Studio Code",
       "exe_name": "Code.exe",
-      "icon_exe": "C:\\Users\\brian\\AppData\\Local\\Programs\\Microsoft VS Code\\Code.exe"
+      "icon_path": "C:\\Users\\brian\\AppData\\Local\\Programs\\Microsoft VS Code\\Code.exe"
+    },
+    {
+      "title_contains": "Realtek Audio Console",
+      "exe_name": "ApplicationFrameHost.exe",
+      "icon_path": "C:\\Program Files\\WindowsApps\\RealtekSemiconductorCorp.RealtekAudioControl_1.52.356.0_x64__dt26b99r8h8gj\\Assets\\Square44x44Logo.targetsize-32.png"
     }
   ]
 }

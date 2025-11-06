@@ -15,19 +15,27 @@ Create a JSON file `config.json` in the same folder as the executable like this:
   },
   "windows": [
     {
-      "title_contains": "Visual Studio Code",
-      "exe_name": "Code.exe",
-      "icon_exe": "C:\\Users\\brian\\AppData\\Local\\Programs\\Microsoft VS Code\\Code.exe"
+      "title_contains": "Slack PWA",
+      "exe_name": "chrome.exe",
+      "icon_path": "C:\\Users\\brian\\AppData\\Local\\slack\\slack.exe"
     },
     {
-      "title_contains": "Microsoft To Do",
-      "exe_name": "C:\\Program Files\\WindowsApps\\Microsoft.Todos_2.148.3611.0_x64__8wekyb3d8bbwe\\Todo.exe"
+      "title_contains": "Visual Studio Code",
+      "exe_name": "Code.exe",
+      "icon_path": "C:\\Users\\brian\\AppData\\Local\\Programs\\Microsoft VS Code\\Code.exe"
+    },
+    {
+      "title_contains": "Realtek Audio Console",
+      "exe_name": "ApplicationFrameHost.exe",
+      "icon_path": "C:\\Program Files\\WindowsApps\\RealtekSemiconductorCorp.RealtekAudioControl_1.52.356.0_x64__dt26b99r8h8gj\\Assets\\Square44x44Logo.targetsize-32.png"
     }
   ]
 }
 ```
 
 and run it. Apps in the config will now be minimised to tray on taskbar.
+
+`icon_path` optionally points to a .exe or image file to use as the tray icon.
 
 Right clicking the main app tray icon and selecting "Hide Main Icon" will remove the main icon from the tray and set `"show_main_icon": false`.
 
